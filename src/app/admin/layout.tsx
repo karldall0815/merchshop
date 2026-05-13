@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/session";
+import { countOpenSupportReports } from "@/modules/support/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "admin") redirect("/");
+  const openCount = await countOpenSupportReports();
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
       <nav className="flex gap-4 border-b pb-3 text-sm">
@@ -26,6 +28,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </Link>
         <Link href="/admin/categories" className="hover:underline">
           Kategorien
+        </Link>
+        <Link href="/admin/support" className="hover:underline">
+          Support{openCount > 0 && <span className="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-destructive/10 text-destructive text-xs">{openCount}</span>}
         </Link>
       </nav>
       {children}
