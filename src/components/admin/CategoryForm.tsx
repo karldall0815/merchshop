@@ -34,10 +34,14 @@ export function CategoryForm({ mode, initial, actorId }: {
     setError(null);
     try {
       if (mode === "create") {
-        await createCategory({
+        const res = await createCategory({
           slug, name, description: description || undefined,
           sortOrder: 0, attributeSchema: schema, variantTemplate,
         }, actorId);
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
         router.push("/admin/categories");
       } else if (initial?.id) {
         const res = await updateCategory({

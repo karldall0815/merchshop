@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,7 @@ export function ProductForm({
   initialCategoryId,
   initialAttributes,
 }: ProductFormProps) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<VariantRow[]>(
@@ -120,7 +122,7 @@ export function ProductForm({
     startTransition(async () => {
       try {
         if (mode === "create") {
-          await createProduct(
+          const res = await createProduct(
             {
               sku: String(formData.get("sku") ?? ""),
               name: String(formData.get("name") ?? ""),
@@ -133,9 +135,14 @@ export function ProductForm({
             },
             actorId
           );
+          if (!res.ok) {
+            setError(res.message);
+            return;
+          }
+          router.push("/catalog");
         } else {
           if (!initial?.id) return;
-          await updateProduct(
+          const res = await updateProduct(
             {
               id: initial.id,
               sku: String(formData.get("sku") ?? ""),
@@ -150,10 +157,14 @@ export function ProductForm({
             },
             actorId
           );
+          if (!res.ok) {
+            setError(res.message);
+            return;
+          }
+          router.push("/catalog");
         }
       } catch (e) {
-        // next/navigation redirect throws — re-throw so the router handles it
-        if (e instanceof Error && e.message === "NEXT_REDIRECT") throw e;
+        // ActionResult no longer throws for domain errors; this catch only handles unexpected runtime errors.
         setError(e instanceof Error ? e.message : "Unbekannter Fehler");
       }
     });
@@ -164,9 +175,13 @@ export function ProductForm({
     if (!confirm("Artikel wirklich archivieren? Er wird aus dem Katalog entfernt.")) return;
     startTransition(async () => {
       try {
-        await archiveProduct(initial.id!, actorId);
+        const res = await archiveProduct(initial.id!, actorId);
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+        router.push("/catalog");
       } catch (e) {
-        if (e instanceof Error && e.message === "NEXT_REDIRECT") throw e;
         setError(e instanceof Error ? e.message : "Unbekannter Fehler");
       }
     });

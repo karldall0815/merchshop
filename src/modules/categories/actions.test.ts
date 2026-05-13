@@ -40,7 +40,7 @@ describe("createCategory", () => {
       slug: "neu", name: "Neu", sortOrder: 0,
       attributeSchema: [], variantTemplate: null,
     }, "actor-1");
-    expect(res.id).toBe("c1");
+    expect(res).toEqual({ ok: true, data: { id: "c1" } });
     expect(m.category.create).toHaveBeenCalled();
     expect(m.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ entity: "Category", action: "create" }),
@@ -48,13 +48,15 @@ describe("createCategory", () => {
   });
 
   it("rejects duplicate key in attributeSchema", async () => {
-    await expect(createCategory({
+    const res = await createCategory({
       slug: "x", name: "X", sortOrder: 0, variantTemplate: null,
       attributeSchema: [
         { key: "k", label: "K1", type: "text", sortOrder: 1 },
         { key: "k", label: "K2", type: "text", sortOrder: 2 },
       ],
-    }, "a")).rejects.toThrow();
+    }, "a");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("VALIDATION_ERROR");
   });
 });
 
