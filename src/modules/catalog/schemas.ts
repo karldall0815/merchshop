@@ -10,11 +10,14 @@ export const productCreateSchema = z.object({
     minStock: z.number().int().min(0).default(0),
   })).default([]),
   initialStock: z.number().int().min(0).default(0),
+  categoryId: z.string().nullable().optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const productUpdateSchema = productCreateSchema.extend({
   id: z.string().min(1),
   active: z.boolean().optional(),
+  confirmCategoryChange: z.boolean().optional(),
 }).omit({ initialStock: true });
 
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;

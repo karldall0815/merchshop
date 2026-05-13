@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getShopProduct } from "@/modules/catalog/queries";
 import { AddToCartForm } from "@/components/shop/AddToCartForm";
 import { ProductGallery } from "@/components/shop/ProductGallery";
+import { ProductPropertiesList } from "@/components/shop/ProductPropertiesList";
+import type { AttributeSchemaItem } from "@/modules/categories/defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,12 @@ export default async function ShopProductPage({
           </div>
           {product.description && (
             <p className="whitespace-pre-line text-sm">{product.description}</p>
+          )}
+          {product.category && (
+            <ProductPropertiesList
+              schema={((product.category.attributeSchema as unknown) as AttributeSchemaItem[]) ?? []}
+              values={(product.attributes as Record<string, unknown> | null) ?? null}
+            />
           )}
           <AddToCartForm productId={product.id} variants={product.variants} />
         </div>

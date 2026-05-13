@@ -6,20 +6,114 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createProduct, updateProduct, archiveProduct } from "@/modules/catalog/actions";
 import { VariantEditor, type VariantRow } from "./VariantEditor";
+import { CategoryPicker } from "./CategoryPicker";
+import { CustomFieldsPanel } from "./CustomFieldsPanel";
+import { CategoryChangeWarningDialog } from "./CategoryChangeWarningDialog";
 import type { ProductUpdateInput } from "@/modules/catalog/schemas";
+import type { AttributeSchemaItem, VariantTemplate } from "@/modules/categories/defaults";
+
+interface CategoryOption {
+  id: string;
+  name: string;
+  active: boolean;
+  isBuiltin: boolean;
+  attributeSchema: AttributeSchemaItem[];
+  variantTemplate: VariantTemplate | null;
+}
 
 interface ProductFormProps {
   mode: "create" | "edit";
   initial?: ProductUpdateInput | null;
   actorId: string;
+  categories: CategoryOption[];
+  initialCategoryId?: string | null;
+  initialAttributes?: Record<string, unknown>;
 }
 
-export function ProductForm({ mode, initial, actorId }: ProductFormProps) {
+function isAttrSet(v: unknown): boolean {
+  if (v === undefined || v === null || v === "") return false;
+  if (Array.isArray(v) && v.length === 0) return false;
+  return true;
+}
+
+function formatValueForDisplay(item: AttributeSchemaItem, value: unknown): string {
+  if (!isAttrSet(value)) return "—";
+  if (item.type === "boolean") return value ? "ja" : "nein";
+  if (item.type === "select") {
+    const opt = (item.options ?? []).find((o) => o.value === value);
+    return opt?.label ?? String(value);
+  }
+  if (item.type === "multiselect" && Array.isArray(value)) {
+    return value
+      .map((v) => (item.options ?? []).find((o) => o.value === v)?.label ?? String(v))
+      .join(", ");
+  }
+  return String(value);
+}
+
+export function ProductForm({
+  mode,
+  initial,
+  actorId,
+  categories,
+  initialCategoryId,
+  initialAttributes,
+}: ProductFormProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<VariantRow[]>(
     initial?.variants ?? []
   );
+  const [categoryId, setCategoryId] = useState<string | null>(
+    initialCategoryId ?? null
+  );
+  const [attributes, setAttributes] = useState<Record<string, unknown>>(
+    initialAttributes ?? {}
+  );
+  const [pendingCategoryChange, setPendingCategoryChange] = useState<
+    | {
+        nextId: string | null;
+        losingFields: { label: string; valueDisplay: string }[];
+      }
+    | null
+  >(null);
+
+  const currentCategory = categoryId
+    ? categories.find((c) => c.id === categoryId) ?? null
+    : null;
+  const currentSchema: AttributeSchemaItem[] = currentCategory?.attributeSchema ?? [];
+
+  function applyCategoryChange(nextId: string | null) {
+    setCategoryId(nextId);
+    setAttributes({});
+    // Only prefill variants if current list is empty, to avoid overwriting user edits.
+    if (variants.length === 0 && nextId) {
+      const nextCat = categories.find((c) => c.id === nextId);
+      const tpl = nextCat?.variantTemplate;
+      if (tpl && tpl.defaults.length > 0) {
+        setVariants(tpl.defaults.map((label) => ({ label, minStock: 0 })));
+      }
+    }
+  }
+
+  function handleCategoryChange(nextId: string | null) {
+    if (nextId === categoryId) return;
+    // Check if we have any meaningful attribute values currently set
+    const hasSetValues =
+      currentSchema.length > 0 &&
+      Object.entries(attributes).some(([, v]) => isAttrSet(v));
+    if (hasSetValues) {
+      const losingFields = currentSchema
+        .filter((item) => isAttrSet(attributes[item.key]))
+        .map((item) => ({
+          label: item.label,
+          valueDisplay: formatValueForDisplay(item, attributes[item.key]),
+        }));
+      setPendingCategoryChange({ nextId, losingFields });
+    } else {
+      applyCategoryChange(nextId);
+    }
+  }
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -34,6 +128,8 @@ export function ProductForm({ mode, initial, actorId }: ProductFormProps) {
               minStock: Number(formData.get("minStock") ?? 0),
               variants,
               initialStock: Number(formData.get("initialStock") ?? 0),
+              categoryId: categoryId ?? null,
+              attributes,
             },
             actorId
           );
@@ -48,6 +144,9 @@ export function ProductForm({ mode, initial, actorId }: ProductFormProps) {
               minStock: Number(formData.get("minStock") ?? 0),
               active: formData.get("active") === "on",
               variants,
+              categoryId: categoryId ?? null,
+              attributes,
+              confirmCategoryChange: true,
             },
             actorId
           );
@@ -149,6 +248,24 @@ export function ProductForm({ mode, initial, actorId }: ProductFormProps) {
         </div>
       )}
 
+      <CategoryPicker
+        categories={categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          active: c.active,
+          isBuiltin: c.isBuiltin,
+        }))}
+        value={categoryId}
+        onChange={handleCategoryChange}
+        disabled={pending}
+      />
+
+      <CustomFieldsPanel
+        schema={currentSchema}
+        values={attributes}
+        onChange={setAttributes}
+      />
+
       <VariantEditor value={variants} onChange={setVariants} />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -174,6 +291,17 @@ export function ProductForm({ mode, initial, actorId }: ProductFormProps) {
           </Button>
         )}
       </div>
+
+      {pendingCategoryChange && (
+        <CategoryChangeWarningDialog
+          losingFields={pendingCategoryChange.losingFields}
+          onCancel={() => setPendingCategoryChange(null)}
+          onConfirm={() => {
+            applyCategoryChange(pendingCategoryChange.nextId);
+            setPendingCategoryChange(null);
+          }}
+        />
+      )}
     </form>
   );
 }

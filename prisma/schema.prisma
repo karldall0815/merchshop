@@ -94,6 +94,9 @@ model Product {
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  attributes Json?
 
   images     ProductImage[]
   variants   ProductVariant[]
@@ -101,6 +104,26 @@ model Product {
   orderItems OrderItem[]
 
   @@index([active])
+  @@index([categoryId])
+}
+
+model Category {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  description     String?
+  attributeSchema Json
+  variantTemplate Json?
+  sortOrder       Int      @default(0)
+  active          Boolean  @default(true)
+  isBuiltin       Boolean  @default(false)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  products Product[]
+
+  @@index([active, sortOrder])
 }
 
 model ProductImage {
