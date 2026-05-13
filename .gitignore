@@ -44,6 +44,9 @@ private/
 docs/*
 !docs/README.md
 
+# Brainstorming-Mockups & Session-State (lokal, niemals committen)
+.superpowers/
+
 # Lokale User-Daten / Backups
 *.csv
 *.xlsx

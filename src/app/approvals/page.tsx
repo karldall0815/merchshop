@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listPendingApprovals } from "@/modules/orders/queries";
+import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function ApprovalsPage() {
                     {new Date(o.createdAt).toLocaleString("de-DE")}
                   </p>
                 </div>
-                <span className="text-sm underline">Prüfen →</span>
+                <OrderStatusBadge order={o} />
               </Link>
             </li>
           ))}

@@ -33,6 +33,7 @@ export async function listUsers() {
       name: true,
       role: true,
       active: true,
+      defaultCostCenter: true,
       createdAt: true,
     },
   });
@@ -92,6 +93,38 @@ export async function setUserActive(userId: string, active: boolean) {
       entityId: userId,
       action: active ? "activate" : "deactivate",
       diff: { active },
+    },
+  });
+  revalidatePath("/admin/users");
+}
+
+const defaultCostCenterSchema = z.object({
+  userId: z.string().min(1),
+  defaultCostCenter: z.string().max(120).optional().nullable(),
+});
+
+export async function updateUserDefaultCostCenter(
+  input: z.input<typeof defaultCostCenterSchema>,
+) {
+  const actor = await requireAdmin();
+  const data = defaultCostCenterSchema.parse(input);
+  const before = await db.user.findUnique({
+    where: { id: data.userId },
+    select: { defaultCostCenter: true },
+  });
+  if (!before) throw new Error("User existiert nicht");
+  const next = data.defaultCostCenter?.trim() || null;
+  await db.user.update({
+    where: { id: data.userId },
+    data: { defaultCostCenter: next },
+  });
+  await db.auditLog.create({
+    data: {
+      actorId: actor.id,
+      entity: "User",
+      entityId: data.userId,
+      action: "update_default_cost_center",
+      diff: { from: before.defaultCostCenter, to: next },
     },
   });
   revalidatePath("/admin/users");

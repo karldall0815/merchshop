@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/session";
 import { isInstalled } from "@/modules/setup/state-machine";
 import { dashboardStats } from "@/modules/dashboard/queries";
-import { StatusBadge } from "@/components/orders/StatusBadge";
+import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,12 @@ export default async function HomePage() {
   const stats = await dashboardStats(user);
   const isApprover = user.role === "approver" || user.role === "admin";
   const isFulfiller = user.role === "agentur" || user.role === "admin";
+  const isAdmin = user.role === "admin";
+
+  // Where to send the user when they click an action item. For requesters,
+  // drafts live in /cart, everything else uses the regular order detail page.
+  const actionItemHref = (status: string, id: string) =>
+    status === "draft" ? "/cart" : `/orders/${id}`;
 
   return (
     <main className="mx-auto max-w-5xl space-y-8 px-6 py-8">
@@ -63,6 +69,80 @@ export default async function HomePage() {
         )}
       </section>
 
+      {/* Auf dich wartet — role-specific worklist, oldest first. */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Auf dich wartet</h2>
+        {isAdmin ? (
+          stats.openSupportReports === 0 && stats.lowStock.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              🎉 Du hast aktuell nichts zu tun.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {stats.openSupportReports > 0 && (
+                <li>
+                  <Link
+                    href="/admin/support"
+                    className="flex items-center justify-between rounded-lg border bg-card p-3 hover:bg-muted/40"
+                  >
+                    <div>
+                      <p className="font-medium">Offene Support-Meldungen</p>
+                      <p className="text-xs text-muted-foreground">
+                        Fehler und Anfragen aus dem Shop
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                      {stats.openSupportReports} offen
+                    </span>
+                  </Link>
+                </li>
+              )}
+              {stats.lowStock.length > 0 && (
+                <li>
+                  <Link
+                    href="/inventory"
+                    className="flex items-center justify-between rounded-lg border bg-card p-3 hover:bg-muted/40"
+                  >
+                    <div>
+                      <p className="font-medium">Artikel unter Mindestbestand</p>
+                      <p className="text-xs text-muted-foreground">
+                        Nachbestellen prüfen
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                      {stats.lowStock.length} Artikel
+                    </span>
+                  </Link>
+                </li>
+              )}
+            </ul>
+          )
+        ) : stats.actionItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            🎉 Du hast aktuell nichts zu tun.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {stats.actionItems.map((o) => (
+              <li key={o.id}>
+                <Link
+                  href={actionItemHref(o.status, o.id)}
+                  className="flex items-center justify-between rounded-lg border bg-card p-3 hover:bg-muted/40"
+                >
+                  <div>
+                    <p className="font-medium">{o.orderNumber ?? "(Entwurf)"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Aktualisiert {new Date(o.updatedAt).toLocaleString("de-DE")}
+                    </p>
+                  </div>
+                  <OrderStatusBadge order={o} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Mein letzten Bestellungen */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -93,7 +173,7 @@ export default async function HomePage() {
                       {new Date(o.createdAt).toLocaleString("de-DE")}
                     </p>
                   </div>
-                  <StatusBadge status={o.status} />
+                  <OrderStatusBadge order={o} />
                 </Link>
               </li>
             ))}

@@ -5,11 +5,19 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { categoryCreateSchema, categoryUpdateSchema, type CategoryCreateInput, type CategoryUpdateInput } from "./schemas";
 import type { AttributeSchemaItem } from "./defaults";
+import { ok, fail, type ActionResult } from "@/lib/action-result";
 
 type AffectedProduct = { id: string; sku: string; name: string };
 
-export async function createCategory(raw: CategoryCreateInput, actorId: string) {
-  const data = categoryCreateSchema.parse(raw);
+export async function createCategory(
+  raw: CategoryCreateInput,
+  actorId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const parsed = categoryCreateSchema.safeParse(raw);
+  if (!parsed.success) {
+    return fail("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Ungültige Eingabe");
+  }
+  const data = parsed.data;
   const cat = await db.category.create({
     data: {
       slug: data.slug,
@@ -26,7 +34,7 @@ export async function createCategory(raw: CategoryCreateInput, actorId: string) 
     data: { entity: "Category", entityId: cat.id, action: "create", actorId, diff: data as object },
   });
   revalidatePath("/admin/categories");
-  return cat;
+  return ok({ id: cat.id });
 }
 
 export async function updateCategory(

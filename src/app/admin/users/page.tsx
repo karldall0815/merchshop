@@ -28,6 +28,7 @@ export default async function AdminUsersPage() {
               <th className="px-4 py-3 text-left font-medium">E-Mail</th>
               <th className="px-4 py-3 text-left font-medium">Rolle</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
+              <th className="px-4 py-3 text-left font-medium">Default-Kostenstelle</th>
               <th className="px-4 py-3 text-left font-medium">Aktionen</th>
             </tr>
           </thead>

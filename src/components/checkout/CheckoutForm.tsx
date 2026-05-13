@@ -1,11 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { createAddressFavorite, deleteAddressFavorite } from "@/modules/orders/addresses";
 import { submitCheckout } from "@/modules/orders/checkout";
+import { FormErrorBanner } from "@/components/forms/FormErrorBanner";
+import type { ActionResult } from "@/lib/action-result";
+
+type ErrorState =
+  | { kind: "result"; value: ActionResult<unknown> }
+  | { kind: "message"; value: string }
+  | null;
 
 type AddressFavorite = {
   id: string;
@@ -19,13 +28,22 @@ type AddressFavorite = {
 
 const emptyAddress = { recipient: "", street: "", zip: "", city: "", country: "DE" };
 
-export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
+export function CheckoutForm({
+  favorites,
+  defaultCostCenter,
+}: {
+  favorites: AddressFavorite[];
+  defaultCostCenter?: string;
+}) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<ErrorState>(null);
 
   const [occasion, setOccasion] = useState("");
-  const [costCenter, setCostCenter] = useState("");
+  const [costCenter, setCostCenter] = useState(defaultCostCenter ?? "");
   const [desiredDate, setDesiredDate] = useState("");
+  const [desiredDateIsDeadline, setDesiredDateIsDeadline] = useState(false);
+  const [contact, setContact] = useState("");
   const [selectedFav, setSelectedFav] = useState<string>(favorites[0]?.id ?? "");
   const [addr, setAddr] = useState(() => {
     const first = favorites[0];
@@ -41,6 +59,10 @@ export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
   });
   const [saveAsFav, setSaveAsFav] = useState(false);
   const [favLabel, setFavLabel] = useState("");
+
+  useEffect(() => {
+    if (!desiredDate && desiredDateIsDeadline) setDesiredDateIsDeadline(false);
+  }, [desiredDate, desiredDateIsDeadline]);
 
   function selectFav(id: string) {
     setSelectedFav(id);
@@ -60,22 +82,31 @@ export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setErrorState(null);
     startTransition(async () => {
-      try {
-        if (saveAsFav && favLabel.trim()) {
+      if (saveAsFav && favLabel.trim()) {
+        try {
           await createAddressFavorite({ label: favLabel.trim(), ...addr });
+        } catch (err) {
+          setErrorState({
+            kind: "message",
+            value: err instanceof Error ? err.message : "Favorit speichern fehlgeschlagen",
+          });
+          return;
         }
-        await submitCheckout({
-          occasion,
-          costCenter,
-          desiredDate,
-          shippingAddress: addr,
-        });
-      } catch (err) {
-        if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
-        setError(err instanceof Error ? err.message : "Submit fehlgeschlagen");
       }
+      const res = await submitCheckout({
+        occasion,
+        costCenter: costCenter || undefined,
+        desiredDate: desiredDate || undefined,
+        desiredDateIsDeadline,
+        shippingAddress: { ...addr, contact: contact || undefined },
+      });
+      if (!res.ok) {
+        setErrorState({ kind: "result", value: res });
+        return;
+      }
+      router.push("/orders");
     });
   }
 
@@ -84,7 +115,10 @@ export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
       try {
         await deleteAddressFavorite(id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Löschen fehlgeschlagen");
+        setErrorState({
+          kind: "message",
+          value: e instanceof Error ? e.message : "Löschen fehlgeschlagen",
+        });
       }
     });
   }
@@ -105,25 +139,58 @@ export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="costCenter">Kostenstelle *</Label>
+            <Label htmlFor="costCenter">Kostenstelle</Label>
             <Input
               id="costCenter"
-              required
               value={costCenter}
               onChange={(e) => setCostCenter(e.target.value)}
               placeholder="z. B. KS-1234"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="desiredDate">Wunschtermin *</Label>
-            <Input
-              id="desiredDate"
-              type="date"
-              required
-              value={desiredDate}
-              onChange={(e) => setDesiredDate(e.target.value)}
-              className="w-fit"
-            />
+            <TooltipProvider delay={150}>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="desiredDate">Wunschtermin</Label>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    aria-label="Erläuterung Wunschtermin"
+                    className="text-muted-foreground text-xs"
+                  >
+                    ℹ️
+                  </TooltipTrigger>
+                  <TooltipContent>Termin, an dem die Ware beim Empfänger ankommen soll</TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                id="desiredDate"
+                type="date"
+                value={desiredDate}
+                onChange={(e) => setDesiredDate(e.target.value)}
+                className="w-fit"
+              />
+              <div className="flex items-center gap-1 pt-1">
+                <input
+                  id="deadline"
+                  type="checkbox"
+                  checked={desiredDateIsDeadline}
+                  disabled={!desiredDate}
+                  onChange={(e) => setDesiredDateIsDeadline(e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="deadline" className="text-sm font-normal">Als Deadline kennzeichnen</Label>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    aria-label="Erläuterung Deadline"
+                    className="text-muted-foreground text-xs"
+                  >
+                    ℹ️
+                  </TooltipTrigger>
+                  <TooltipContent>Spätester Anliefertermin — die Ware muss bis dahin da sein</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </div>
         </div>
       </fieldset>
@@ -169,6 +236,16 @@ export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
               required
               value={addr.recipient}
               onChange={(e) => setAddr({ ...addr, recipient: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="contact">Ansprechpartner / Abteilung / Betreff <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input
+              id="contact"
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              placeholder="z. Hd. Frau Müller, Marketing"
+              maxLength={200}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -230,7 +307,10 @@ export function CheckoutForm({ favorites }: { favorites: AddressFavorite[] }) {
         </div>
       </fieldset>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <FormErrorBanner
+        result={errorState?.kind === "result" ? errorState.value : null}
+        message={errorState?.kind === "message" ? errorState.value : null}
+      />
 
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Sende…" : "Bestellung absenden"}

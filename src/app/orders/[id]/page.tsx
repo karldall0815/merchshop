@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/session";
 import { getOrderDetail } from "@/modules/orders/queries";
 import { StatusBadge } from "@/components/orders/StatusBadge";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,14 @@ export default async function OrderDetailPage({
   if (!canSee) notFound();
 
   const addr = order.shippingAddress as
-    | { recipient: string; street: string; zip: string; city: string; country: string }
+    | {
+        recipient: string;
+        contact?: string;
+        street: string;
+        zip: string;
+        city: string;
+        country: string;
+      }
     | null;
 
   return (
@@ -40,14 +48,24 @@ export default async function OrderDetailPage({
         <div>
           <h1 className="text-2xl font-semibold">{order.orderNumber ?? "(ohne Nummer)"}</h1>
           <p className="text-sm text-muted-foreground">
-            {order.occasion ?? "—"} · {order.costCenter ?? "—"} · Wunschtermin{" "}
-            {order.desiredDate
-              ? new Date(order.desiredDate).toLocaleDateString("de-DE")
-              : "—"}
+            {order.occasion ?? "—"} · {order.costCenter ?? "—"}
           </p>
+          {order.desiredDate && (order.desiredDateIsDeadline ? (
+            <div className="text-sm">
+              <span className="font-semibold text-red-700">📅 Deadline:</span>{" "}
+              {new Date(order.desiredDate).toLocaleDateString("de-DE")}
+            </div>
+          ) : (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Wunsch:</span>{" "}
+              {new Date(order.desiredDate).toLocaleDateString("de-DE")}
+            </div>
+          ))}
         </div>
         <StatusBadge status={order.status} />
       </header>
+
+      <OrderTimeline order={order} />
 
       <section className="space-y-2 rounded-lg border bg-card p-4">
         <h2 className="font-medium">Artikel</h2>
@@ -81,7 +99,10 @@ export default async function OrderDetailPage({
       {addr && (
         <section className="space-y-1 rounded-lg border bg-card p-4 text-sm">
           <h2 className="font-medium">Lieferadresse</h2>
-          <p>{addr.recipient}</p>
+          {addr.recipient && <p className="font-medium">{addr.recipient}</p>}
+          {addr.contact && (
+            <p className="text-sm text-muted-foreground">{addr.contact}</p>
+          )}
           <p>{addr.street}</p>
           <p>
             {addr.zip} {addr.city}

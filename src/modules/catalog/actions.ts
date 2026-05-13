@@ -2,21 +2,33 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { productCreateSchema, productUpdateSchema, type ProductCreateInput, type ProductUpdateInput } from "./schemas";
 import { recordMovement } from "@/modules/inventory/movements";
 import { buildAttributeValidator } from "@/modules/categories/attribute-validator";
 import type { AttributeSchemaItem } from "@/modules/categories/defaults";
 import { Prisma } from "@prisma/client";
+import { ok, fail, type ActionResult } from "@/lib/action-result";
 
-export async function createProduct(raw: ProductCreateInput, actorId: string) {
-  const data = productCreateSchema.parse(raw);
+export async function createProduct(
+  raw: ProductCreateInput,
+  actorId: string,
+): Promise<ActionResult<{ productId: string }>> {
+  const parsed = productCreateSchema.safeParse(raw);
+  if (!parsed.success) {
+    return fail("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Ungültige Eingabe");
+  }
+  const data = parsed.data;
+
   let validatedAttributes: Record<string, unknown> = {};
   if (data.categoryId) {
     const cat = await db.category.findUnique({ where: { id: data.categoryId } });
-    if (!cat) throw new Error("Category not found");
+    if (!cat) return fail("NOT_FOUND", "Kategorie nicht gefunden");
     const validator = buildAttributeValidator(((cat.attributeSchema as unknown) as AttributeSchemaItem[]) ?? []);
-    validatedAttributes = validator.parse(data.attributes ?? {}) as Record<string, unknown>;
+    const attrParsed = validator.safeParse(data.attributes ?? {});
+    if (!attrParsed.success) {
+      return fail("VALIDATION_ERROR", attrParsed.error.issues[0]?.message ?? "Ungültige Attribute");
+    }
+    validatedAttributes = attrParsed.data as Record<string, unknown>;
   }
   const product = await db.product.create({
     data: {
@@ -50,25 +62,37 @@ export async function createProduct(raw: ProductCreateInput, actorId: string) {
     data: { entity: "Product", entityId: product.id, action: "create", actorId, diff: data as object },
   });
   revalidatePath("/catalog");
-  redirect("/catalog");
+  return ok({ productId: product.id });
 }
 
-export async function updateProduct(raw: ProductUpdateInput, actorId: string) {
-  const data = productUpdateSchema.parse(raw);
+export async function updateProduct(
+  raw: ProductUpdateInput,
+  actorId: string,
+): Promise<ActionResult<{ productId: string }>> {
+  const parsed = productUpdateSchema.safeParse(raw);
+  if (!parsed.success) {
+    return fail("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Ungültige Eingabe");
+  }
+  const data = parsed.data;
+
   const existing = await db.product.findUnique({ where: { id: data.id } });
-  if (!existing) throw new Error("Product not found");
+  if (!existing) return fail("NOT_FOUND", "Produkt nicht gefunden");
 
   const categoryChanged = (existing.categoryId ?? null) !== (data.categoryId ?? null);
   if (categoryChanged && !data.confirmCategoryChange) {
-    throw new Error("CATEGORY_CHANGE_REQUIRES_CONFIRM");
+    return fail("CATEGORY_CHANGE_REQUIRES_CONFIRM", "Kategoriewechsel benötigt Bestätigung");
   }
 
   let validatedAttributes: Record<string, unknown> = {};
   if (data.categoryId) {
     const cat = await db.category.findUnique({ where: { id: data.categoryId } });
-    if (!cat) throw new Error("Category not found");
+    if (!cat) return fail("NOT_FOUND", "Kategorie nicht gefunden");
     const validator = buildAttributeValidator(((cat.attributeSchema as unknown) as AttributeSchemaItem[]) ?? []);
-    validatedAttributes = validator.parse(data.attributes ?? {}) as Record<string, unknown>;
+    const attrParsed = validator.safeParse(data.attributes ?? {});
+    if (!attrParsed.success) {
+      return fail("VALIDATION_ERROR", attrParsed.error.issues[0]?.message ?? "Ungültige Attribute");
+    }
+    validatedAttributes = attrParsed.data as Record<string, unknown>;
   }
   await db.product.update({
     where: { id: data.id },
@@ -93,13 +117,14 @@ export async function updateProduct(raw: ProductUpdateInput, actorId: string) {
   });
   revalidatePath("/catalog");
   revalidatePath(`/catalog/${data.id}/edit`);
-  redirect("/catalog");
+  return ok({ productId: data.id });
 }
 
-export async function archiveProduct(id: string, actorId: string) {
+export async function archiveProduct(id: string, actorId: string): Promise<ActionResult> {
   await db.product.update({ where: { id }, data: { active: false } });
   await db.auditLog.create({
     data: { entity: "Product", entityId: id, action: "archive", actorId, diff: {} },
   });
   revalidatePath("/catalog");
+  return ok();
 }

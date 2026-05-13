@@ -31,6 +31,20 @@ async function main() {
     });
   }
   console.log(`Seeded ${BUILTIN_CATEGORIES.length} built-in categories`);
+
+  const SUPPORT_SETTINGS: { key: string; value: string }[] = [
+    { key: "support.errorAutoReport",          value: "true" },
+    { key: "support.errorReportDedupeMinutes", value: "5" },
+    { key: "support.notifyAdminsByMail",       value: "true" },
+  ];
+  for (const s of SUPPORT_SETTINGS) {
+    await db.setting.upsert({
+      where: { key: s.key },
+      create: { key: s.key, value: s.value, encrypted: false },
+      update: {},   // do not overwrite existing user-set values
+    });
+  }
+  console.log(`Seeded ${SUPPORT_SETTINGS.length} support default settings`);
 }
 
 main()

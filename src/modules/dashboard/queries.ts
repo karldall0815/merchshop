@@ -2,21 +2,35 @@ import { db } from "@/lib/db";
 import { OrderStatus } from "@prisma/client";
 import type { SessionUser } from "@/modules/auth/session";
 import { currentStock } from "@/modules/inventory/stock";
+import { countOpenSupportReports } from "@/modules/support/queries";
+
+// Snapshot of an order with everything OrderStatusBadge needs.
+export type ActionItemOrder = {
+  id: string;
+  orderNumber: string | null;
+  status: OrderStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  approverId: string | null;
+  approvedAt: Date | null;
+  shippedAt: Date | null;
+  deliveredAt: Date | null;
+  rejectionReason: string | null;
+  approver: { name: string } | null;
+};
 
 export type DashboardStats = {
   myDraftItems: number;
   myOpenOrders: number;
-  myRecentOrders: Array<{
-    id: string;
-    orderNumber: string | null;
-    status: OrderStatus;
-    createdAt: Date;
-  }>;
+  myRecentOrders: ActionItemOrder[];
   pendingApprovals: number;
   fulfillmentApproved: number;
   fulfillmentProcessing: number;
   fulfillmentShipped: number;
   lowStock: Array<{ id: string; name: string; sku: string; minStock: number; current: number }>;
+  // Items the current user is expected to act on next, oldest-pending first.
+  actionItems: ActionItemOrder[];
+  openSupportReports: number;
 };
 
 // One DB hit per role-relevant chunk so the dashboard renders fast even
@@ -45,7 +59,19 @@ export async function dashboardStats(user: SessionUser): Promise<DashboardStats>
     where: { requesterId: user.id, status: { not: OrderStatus.draft } },
     orderBy: { createdAt: "desc" },
     take: 5,
-    select: { id: true, orderNumber: true, status: true, createdAt: true },
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      approverId: true,
+      approvedAt: true,
+      shippedAt: true,
+      deliveredAt: true,
+      rejectionReason: true,
+      approver: { select: { name: true } },
+    },
   });
 
   // Role-gated counts: only compute the heavy ones for users who'll see them.
@@ -81,6 +107,55 @@ export async function dashboardStats(user: SessionUser): Promise<DashboardStats>
     }
   }
 
+  // "Auf dich wartet" — role-specific list of orders that the user must act
+  // on next. Oldest pending first so the longest-waiting items bubble up.
+  const actionItemSelect = {
+    id: true,
+    orderNumber: true,
+    status: true,
+    createdAt: true,
+    updatedAt: true,
+    approverId: true,
+    approvedAt: true,
+    shippedAt: true,
+    deliveredAt: true,
+    rejectionReason: true,
+    approver: { select: { name: true } },
+  } as const;
+
+  let actionItems: ActionItemOrder[] = [];
+  if (user.role === "requester") {
+    actionItems = await db.order.findMany({
+      where: {
+        requesterId: user.id,
+        status: { in: [OrderStatus.draft, OrderStatus.rejected] },
+      },
+      orderBy: { updatedAt: "asc" },
+      take: 10,
+      select: actionItemSelect,
+    });
+  } else if (user.role === "approver") {
+    // Pending orders are not yet assigned to a specific approver; any
+    // approver can pick them up. Show them all here. Once admins want
+    // a per-approver routing the OR-clause below can be tightened.
+    actionItems = await db.order.findMany({
+      where: { status: OrderStatus.pending },
+      orderBy: { updatedAt: "asc" },
+      take: 10,
+      select: actionItemSelect,
+    });
+  } else if (user.role === "agentur") {
+    actionItems = await db.order.findMany({
+      where: { status: { in: [OrderStatus.approved, OrderStatus.processing] } },
+      orderBy: { updatedAt: "asc" },
+      take: 10,
+      select: actionItemSelect,
+    });
+  }
+  // admin: action items shown via SupportReports + low-stock; no order list here.
+
+  const openSupportReports = user.role === "admin" ? await countOpenSupportReports() : 0;
+
   return {
     myDraftItems,
     myOpenOrders,
@@ -90,5 +165,7 @@ export async function dashboardStats(user: SessionUser): Promise<DashboardStats>
     fulfillmentProcessing,
     fulfillmentShipped,
     lowStock,
+    actionItems,
+    openSupportReports,
   };
 }

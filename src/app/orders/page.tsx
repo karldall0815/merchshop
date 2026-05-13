@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/modules/auth/session";
 import { listMyOrders } from "@/modules/orders/queries";
-import { StatusBadge } from "@/components/orders/StatusBadge";
+import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function OrdersPage() {
                     {new Date(o.createdAt).toLocaleString("de-DE")}
                   </p>
                 </div>
-                <StatusBadge status={o.status} />
+                <OrderStatusBadge order={o} />
               </Link>
             </li>
           ))}

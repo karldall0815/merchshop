@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getOrderDetail } from "@/modules/orders/queries";
 import { StatusBadge } from "@/components/orders/StatusBadge";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { ApprovalControls } from "@/components/approvals/ApprovalControls";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,14 @@ export default async function ApprovalDetailPage({
   if (!order) notFound();
 
   const addr = order.shippingAddress as
-    | { recipient: string; street: string; zip: string; city: string; country: string }
+    | {
+        recipient: string;
+        contact?: string;
+        street: string;
+        zip: string;
+        city: string;
+        country: string;
+      }
     | null;
 
   return (
@@ -31,14 +39,24 @@ export default async function ApprovalDetailPage({
           <h1 className="text-2xl font-semibold">{order.orderNumber ?? "(ohne Nummer)"}</h1>
           <p className="text-sm text-muted-foreground">
             Besteller: <span className="font-medium">{order.requester.name}</span> ·{" "}
-            {order.occasion ?? "—"} · KS {order.costCenter ?? "—"} · Wunschtermin{" "}
-            {order.desiredDate
-              ? new Date(order.desiredDate).toLocaleDateString("de-DE")
-              : "—"}
+            {order.occasion ?? "—"} · KS {order.costCenter ?? "—"}
           </p>
+          {order.desiredDate && (order.desiredDateIsDeadline ? (
+            <div className="text-sm">
+              <span className="font-semibold text-red-700">📅 Deadline:</span>{" "}
+              {new Date(order.desiredDate).toLocaleDateString("de-DE")}
+            </div>
+          ) : (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Wunsch:</span>{" "}
+              {new Date(order.desiredDate).toLocaleDateString("de-DE")}
+            </div>
+          ))}
         </div>
         <StatusBadge status={order.status} />
       </header>
+
+      <OrderTimeline order={order} />
 
       <section className="rounded-lg border bg-card p-4">
         <h2 className="mb-2 font-medium">Artikel</h2>
@@ -72,7 +90,10 @@ export default async function ApprovalDetailPage({
       {addr && (
         <section className="space-y-1 rounded-lg border bg-card p-4 text-sm">
           <h2 className="font-medium">Lieferadresse</h2>
-          <p>{addr.recipient}</p>
+          {addr.recipient && <p className="font-medium">{addr.recipient}</p>}
+          {addr.contact && (
+            <p className="text-sm text-muted-foreground">{addr.contact}</p>
+          )}
           <p>{addr.street}</p>
           <p>
             {addr.zip} {addr.city}

@@ -15,11 +15,6 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/navigation", () => ({
-  redirect: vi.fn((url: string) => {
-    throw new Error("NEXT_REDIRECT:" + url);
-  }),
-}));
 
 import { createProduct, archiveProduct } from "./actions";
 import { db } from "@/lib/db";
@@ -37,15 +32,15 @@ beforeEach(() => {
 
 describe("createProduct", () => {
   it("creates product, variants and initial stock movement", async () => {
-    await expect(
-      createProduct({
-        sku: "MUG-001",
-        name: "Tasse",
-        minStock: 5,
-        variants: [{ label: "S", minStock: 0 }, { label: "L", minStock: 0 }],
-        initialStock: 12,
-      }, "actor-1")
-    ).rejects.toThrow("NEXT_REDIRECT");
+    const res = await createProduct({
+      sku: "MUG-001",
+      name: "Tasse",
+      minStock: 5,
+      variants: [{ label: "S", minStock: 0 }, { label: "L", minStock: 0 }],
+      initialStock: 12,
+    }, "actor-1");
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data?.productId).toBeDefined();
     expect(m.product.create).toHaveBeenCalled();
     expect(m.productVariant.createMany).toHaveBeenCalled();
     expect(m.stockMovement.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -54,19 +49,22 @@ describe("createProduct", () => {
   });
 
   it("rejects invalid SKU", async () => {
-    await expect(createProduct({
+    const res = await createProduct({
       sku: "with spaces",
       name: "x",
       minStock: 0,
       variants: [],
       initialStock: 0,
-    } as never, "actor-1")).rejects.toThrow();
+    } as never, "actor-1");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("VALIDATION_ERROR");
   });
 });
 
 describe("archiveProduct", () => {
   it("sets active=false and writes audit log", async () => {
-    await archiveProduct("p1", "actor-1");
+    const res = await archiveProduct("p1", "actor-1");
+    expect(res.ok).toBe(true);
     expect(m.product.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "p1" }, data: { active: false },
     }));
@@ -88,11 +86,12 @@ describe("createProduct with category", () => {
   });
 
   it("creates with valid attributes", async () => {
-    await expect(createProduct({
+    const res = await createProduct({
       sku: "BR-001", name: "Brezel", minStock: 0, variants: [], initialStock: 0,
       categoryId: "cat-food",
       attributes: { mhd: "2026-12-31", packSize: 10, bio: true },
-    }, "actor-1")).rejects.toThrow("NEXT_REDIRECT");
+    }, "actor-1");
+    expect(res.ok).toBe(true);
     expect(m.product.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         categoryId: "cat-food",
@@ -102,33 +101,36 @@ describe("createProduct with category", () => {
   });
 
   it("rejects invalid attribute (bad date)", async () => {
-    await expect(createProduct({
+    const res = await createProduct({
       sku: "BR-002", name: "X", minStock: 0, variants: [], initialStock: 0,
       categoryId: "cat-food",
       attributes: { mhd: "31.12.2026" },
-    }, "actor-1")).rejects.toThrow();
+    }, "actor-1");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("VALIDATION_ERROR");
   });
 
   it("strips unknown attribute keys silently", async () => {
-    await expect(createProduct({
+    const res = await createProduct({
       sku: "BR-003", name: "X", minStock: 0, variants: [], initialStock: 0,
       categoryId: "cat-food",
       attributes: { mhd: "2026-12-31", foo: "drop" },
-    }, "actor-1")).rejects.toThrow("NEXT_REDIRECT");
+    }, "actor-1");
+    expect(res.ok).toBe(true);
     const callArg = m.product.create.mock.calls[0][0].data.attributes;
     expect(callArg.foo).toBeUndefined();
     expect(callArg.mhd).toBe("2026-12-31");
   });
 
   it("creates without category (attributes ignored)", async () => {
-    await expect(createProduct({
+    const res = await createProduct({
       sku: "FR-001", name: "Frei", minStock: 0, variants: [], initialStock: 0,
       categoryId: null,
       attributes: { something: "ignored" },
-    }, "actor-1")).rejects.toThrow("NEXT_REDIRECT");
+    }, "actor-1");
+    expect(res.ok).toBe(true);
     const callArg = m.product.create.mock.calls[0][0].data;
     expect(callArg.categoryId).toBeNull();
     expect(callArg.attributes).toEqual({});
   });
 });
-
