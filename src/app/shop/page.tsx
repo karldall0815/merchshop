@@ -1,8 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { listShopProducts } from "@/modules/catalog/queries";
+import { listCategories } from "@/modules/categories/queries";
 import { ShopSearchBox } from "@/components/shop/ShopSearchBox";
 import { ShopViewToggle, type ShopView } from "@/components/shop/ShopViewToggle";
+import { CategoryPills } from "@/components/shop/CategoryPills";
+import { CustomFiltersSidebar } from "@/components/shop/CustomFiltersSidebar";
+import { parseShopFilters, filtersToPrismaWhere } from "@/lib/shop-filters";
+import type { AttributeSchemaItem } from "@/modules/categories/defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +16,40 @@ type ProductCard = Awaited<ReturnType<typeof listShopProducts>>[number];
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; view?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, view: rawView } = await searchParams;
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q : undefined;
+  const rawView = typeof params.view === "string" ? params.view : undefined;
   const view: ShopView = rawView === "list" ? "list" : "grid";
-  const products = await listShopProducts(q);
+
+  // Re-encode params into a URLSearchParams so the helper can parse them
+  // the same way it would on the client.
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) sp.append(key, v);
+    } else {
+      sp.set(key, value);
+    }
+  }
+
+  const filters = parseShopFilters(sp);
+  const categories = await listCategories({ activeOnly: true });
+
+  // Filter sidebar is only shown when exactly one category is selected.
+  let activeCategory: (typeof categories)[number] | null = null;
+  let schema: AttributeSchemaItem[] = [];
+  if (filters.categoryId) {
+    activeCategory = categories.find((c) => c.id === filters.categoryId) ?? null;
+    if (activeCategory) {
+      schema = (activeCategory.attributeSchema as unknown as AttributeSchemaItem[]) ?? [];
+    }
+  }
+
+  const where = filtersToPrismaWhere(filters, schema);
+  const products = await listShopProducts(q, where);
 
   return (
     <div className="space-y-6">
@@ -24,16 +58,41 @@ export default async function ShopPage({
         <ShopViewToggle current={view} />
       </header>
       <ShopSearchBox initial={q ?? ""} />
+      <CategoryPills
+        categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+        activeId={filters.categoryId}
+      />
 
-      {products.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {q ? `Keine Treffer für „${q}"` : "Keine Artikel verfügbar."}
+      {activeCategory && schema.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[16rem_1fr]">
+          <aside>
+            <CustomFiltersSidebar schema={schema} />
+          </aside>
+          <div>
+            {products.length === 0 ? (
+              <EmptyState q={q} />
+            ) : view === "grid" ? (
+              <GridView products={products} />
+            ) : (
+              <ListView products={products} />
+            )}
+          </div>
         </div>
+      ) : products.length === 0 ? (
+        <EmptyState q={q} />
       ) : view === "grid" ? (
         <GridView products={products} />
       ) : (
         <ListView products={products} />
       )}
+    </div>
+  );
+}
+
+function EmptyState({ q }: { q?: string }) {
+  return (
+    <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+      {q ? `Keine Treffer für „${q}"` : "Keine Artikel verfügbar."}
     </div>
   );
 }

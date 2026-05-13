@@ -32,9 +32,16 @@ export async function getProductDetail(id: string) {
 // `query` (optional) does a case-insensitive `contains` over name + sku
 // — keeps the surface narrow enough that an index on Product.name would
 // only marginally help (catalogues stay <500 rows in this domain).
-export async function listShopProducts(query?: string) {
+//
+// `extraWhere` is merged via AND so callers can layer category + attribute
+// filters on top without re-implementing the search/active baseline.
+export async function listShopProducts(
+  query?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extraWhere?: any,
+) {
   const q = query?.trim();
-  const where = q
+  const baseWhere = q
     ? {
         active: true,
         OR: [
@@ -44,6 +51,10 @@ export async function listShopProducts(query?: string) {
         ],
       }
     : { active: true };
+  const where =
+    extraWhere && Object.keys(extraWhere).length > 0
+      ? { AND: [baseWhere, extraWhere] }
+      : baseWhere;
   const products = await db.product.findMany({
     where,
     orderBy: { name: "asc" },
