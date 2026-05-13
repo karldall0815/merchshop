@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { listFulfillmentColumns } from "@/modules/orders/queries";
+import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
+import type { OrderForStatus } from "@/components/orders/order-status-meta";
 
 export const dynamic = "force-dynamic";
 
-type CardRow = {
+type CardRow = OrderForStatus & {
   id: string;
   orderNumber: string | null;
   occasion: string | null;
@@ -20,8 +22,13 @@ function Card({ o }: { o: CardRow }) {
       href={`/fulfillment/${o.id}`}
       className="block rounded-md border bg-card p-3 hover:bg-muted/40"
     >
-      <p className="font-medium">{o.orderNumber ?? "(ohne Nummer)"}</p>
-      <p className="text-xs text-muted-foreground">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium">{o.orderNumber ?? "(ohne Nummer)"}</p>
+      </div>
+      <div className="mt-1">
+        <OrderStatusBadge order={o} />
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
         {o.requester.name} · {o._count.items} Artikel
       </p>
       {o.occasion && <p className="mt-1 truncate text-xs">{o.occasion}</p>}
