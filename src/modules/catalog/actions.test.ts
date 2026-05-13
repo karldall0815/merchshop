@@ -16,7 +16,14 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
+// Default mock: an admin user — most tests run write-actions that require role check.
+// Individual tests can override via vi.mocked(getCurrentUser).mockResolvedValueOnce(...)
+vi.mock("@/modules/auth/session", () => ({
+  getCurrentUser: vi.fn().mockResolvedValue({ id: "actor-1", role: "admin" }),
+}));
+
 import { createProduct, archiveProduct } from "./actions";
+import { getCurrentUser } from "@/modules/auth/session";
 import { db } from "@/lib/db";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const m = db as any;
@@ -132,5 +139,47 @@ describe("createProduct with category", () => {
     const callArg = m.product.create.mock.calls[0][0].data;
     expect(callArg.categoryId).toBeNull();
     expect(callArg.attributes).toEqual({});
+  });
+});
+
+describe("catalog write RBAC", () => {
+  it("refuses createProduct for requester role", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce({
+      id: "u1", name: "R", email: "r@x", role: "requester" as never,
+    } as never);
+    const res = await createProduct({
+      sku: "X-001", name: "X", minStock: 0, variants: [], initialStock: 0,
+    }, "u1");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("PERMISSION_DENIED");
+    expect(m.product.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses createProduct for approver role", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce({
+      id: "u2", name: "A", email: "a@x", role: "approver" as never,
+    } as never);
+    const res = await createProduct({
+      sku: "X-002", name: "X", minStock: 0, variants: [], initialStock: 0,
+    }, "u2");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("refuses archiveProduct without an authenticated user", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce(null as never);
+    const res = await archiveProduct("p1", "u1");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("allows createProduct for agentur role", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce({
+      id: "u3", name: "Ag", email: "ag@x", role: "agentur" as never,
+    } as never);
+    const res = await createProduct({
+      sku: "AG-001", name: "Ag", minStock: 0, variants: [], initialStock: 0,
+    }, "u3");
+    expect(res.ok).toBe(true);
   });
 });
