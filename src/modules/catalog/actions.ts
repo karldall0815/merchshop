@@ -8,11 +8,29 @@ import { buildAttributeValidator } from "@/modules/categories/attribute-validato
 import type { AttributeSchemaItem } from "@/modules/categories/defaults";
 import { Prisma } from "@prisma/client";
 import { ok, fail, type ActionResult } from "@/lib/action-result";
+import { getCurrentUser } from "@/modules/auth/session";
+
+// Server-side defence-in-depth. The route layout in src/app/catalog/layout.tsx
+// also bounces non-admin/agentur users, but actions can be invoked directly
+// (e.g. via a bot calling the form-action endpoint), so we re-check here.
+async function ensureCatalogWriteRole():
+  Promise<{ ok: false; code: "PERMISSION_DENIED"; message: string } | null>
+{
+  const user = await getCurrentUser().catch(() => null);
+  if (!user) return { ok: false, code: "PERMISSION_DENIED", message: "Nicht eingeloggt" };
+  if (user.role !== "admin" && user.role !== "agentur") {
+    return { ok: false, code: "PERMISSION_DENIED", message: "Nur Admin oder Agentur darf Artikel verwalten" };
+  }
+  return null;
+}
 
 export async function createProduct(
   raw: ProductCreateInput,
   actorId: string,
 ): Promise<ActionResult<{ productId: string }>> {
+  const denied = await ensureCatalogWriteRole();
+  if (denied) return denied;
+
   const parsed = productCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return fail("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Ungültige Eingabe");
@@ -69,6 +87,9 @@ export async function updateProduct(
   raw: ProductUpdateInput,
   actorId: string,
 ): Promise<ActionResult<{ productId: string }>> {
+  const denied = await ensureCatalogWriteRole();
+  if (denied) return denied;
+
   const parsed = productUpdateSchema.safeParse(raw);
   if (!parsed.success) {
     return fail("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Ungültige Eingabe");
@@ -121,6 +142,9 @@ export async function updateProduct(
 }
 
 export async function archiveProduct(id: string, actorId: string): Promise<ActionResult> {
+  const denied = await ensureCatalogWriteRole();
+  if (denied) return denied;
+
   await db.product.update({ where: { id }, data: { active: false } });
   await db.auditLog.create({
     data: { entity: "Product", entityId: id, action: "archive", actorId, diff: {} },

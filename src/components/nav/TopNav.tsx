@@ -13,6 +13,7 @@ import {
   Truck,
   BarChart3,
   Settings,
+  LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
@@ -35,9 +36,10 @@ const PRIMARY: NavItem[] = [
 ];
 
 // Quick-access nav (right side) — utility actions distinct from the
-// workflow itself. Cart for shoppers, settings for admin.
+// workflow itself. Cart for shoppers, support for everyone, settings for admin.
 const UTILITY: NavItem[] = [
   { href: "/cart", label: "Warenkorb", icon: ShoppingCart, allow: ["admin", "agentur", "approver", "requester"] },
+  { href: "/support", label: "Support", icon: LifeBuoy, allow: ["admin", "agentur", "approver", "requester"] },
   { href: "/admin/users", label: "Einstellungen", icon: Settings, allow: ["admin"] },
 ];
 
