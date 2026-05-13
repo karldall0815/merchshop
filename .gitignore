@@ -1,0 +1,112 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# =========================================================
+# WICHTIG — Public-Repo: KEINE personenbezogenen Daten,
+# Secrets, Mailadressen oder Zugangsdaten committen.
+# =========================================================
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Lokale Konfiguration & Notizen
+NOTES.md
+notes.md
+TODO.local.md
+*.local.md
+*.private.*
+secrets/
+private/
+.secrets/
+
+# =========================================================
+# DOKU: docs/ enthält Infrastruktur-, Security- und interne
+# Projekt-Doku. Public-Repo darf davon NICHTS sehen außer
+# der minimalen Top-Level-README. Niemals erweitern ohne
+# Rücksprache — siehe CLAUDE.md "Doku-Pflicht".
+# =========================================================
+docs/*
+!docs/README.md
+
+# Lokale User-Daten / Backups
+*.csv
+*.xlsx
+*.xls
+backup/
+backups/
+dump/
+dumps/
+*.dump
+*.sql.gz
+
+# Seed-Daten mit Echtdaten ausschließen (Test-Seeds explizit whitelisten)
+prisma/seed.local.ts
+prisma/seed.private.ts
+prisma/data/*
+!prisma/data/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Lokale KI-Assistenten-Konfiguration (kann User-Pfade enthalten)
+.claude/
+.cursor/
+.aider*
+.continue/
+
+# IDE / OS
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Docker volumes (lokal)
+.docker-data/
+minio-data/
+postgres-data/
+
+# Misc
+*.tgz
+.cache/
+.turbo/
+
+# Next.js specific
+next-env.d.ts
+.vercel
+
+# pnpm
+/.pnp
+.pnp.*
+.ssh-ephemeral/

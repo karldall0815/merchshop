@@ -1,0 +1,234 @@
+generator client {
+  provider      = "prisma-client-js"
+  // "native" covers local dev (the host doing the build);
+  // "debian-openssl-3.0.x" matches the production runtime image
+  // (node:20-bookworm-slim, which ships OpenSSL 3).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  agentur
+  approver
+  requester
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  totpSecret   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs        AuditLog[]        @relation("AuditActor")
+  orders           Order[]           @relation("OrderRequester")
+  approvedOrders   Order[]           @relation("OrderApprover")
+  approvals        ApprovalLog[]
+  addressFavorites AddressFavorite[]
+}
+
+model AddressFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  recipient String
+  street    String
+  zip       String
+  city      String
+  country   String   @default("DE")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SystemSetup {
+  id             Int       @id @default(1)
+  installedAt    DateTime?
+  version        String    @default("1.0.0")
+  currentStep    String    @default("welcome")
+  setupToken     String?
+  tokenExpiresAt DateTime?
+
+  @@map("system_setup")
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id])
+  entity    String
+  entityId  String?
+  action    String
+  diff      Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  description String?  @db.Text
+  minStock    Int      @default(0)
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  images     ProductImage[]
+  variants   ProductVariant[]
+  movements  StockMovement[]
+  orderItems OrderItem[]
+
+  @@index([active])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId, sortOrder])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  minStock  Int     @default(0)
+  active    Boolean @default(true)
+
+  movements  StockMovement[]
+  orderItems OrderItem[]
+
+  @@unique([productId, label])
+}
+
+enum StockReason {
+  initial
+  restock
+  order
+  correction
+  return_to_stock
+}
+
+model StockMovement {
+  id        String          @id @default(cuid())
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  delta     Int
+  reason    StockReason
+  comment   String?
+  orderId   String?
+  actorId   String?
+  createdAt DateTime        @default(now())
+
+  @@index([productId, createdAt])
+  @@index([variantId, createdAt])
+}
+
+enum OrderStatus {
+  draft
+  pending
+  approved
+  rejected
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  // Human-friendly running number; only assigned at draft → pending.
+  // NULL for drafts so the sequence stays gap-free for real orders.
+  orderNumber String?     @unique
+  requesterId String
+  requester   User        @relation("OrderRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  status      OrderStatus @default(draft)
+
+  // Filled during checkout, persisted alongside the order. Address is JSON
+  // so the order remains readable even if the requester later deletes the
+  // matching favorite (same pattern as OrderItem snapshots).
+  occasion        String?
+  costCenter      String?
+  desiredDate     DateTime?
+  shippingAddress Json?
+
+  // Approval / fulfillment side-channel.
+  approverId      String?
+  approver        User?     @relation("OrderApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  rejectionReason String?
+  trackingNumber  String?
+  carrier         String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     OrderItem[]
+  approvals ApprovalLog[]
+
+  @@index([requesterId, status])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String          @id @default(cuid())
+  orderId   String
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  quantity  Int
+
+  // Snapshots so historical orders stay readable even after the product
+  // is renamed / image swapped / archived.
+  snapshotName     String
+  snapshotImageUrl String?
+  snapshotVariant  String?
+
+  @@index([orderId])
+}
+
+model ApprovalLog {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  action    String // approve | reject | comment
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}

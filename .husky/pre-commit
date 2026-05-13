@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pre-Commit-Hook: PII-Scan + Lint-Staged.
+# Wird via Husky aktiviert (siehe package.json "prepare"-Script).
+
+set -e
+
+# 1. PII-Check
+./scripts/check-no-pii.sh
+
+# 2. Lint-Staged (wenn vorhanden — wird später beim ersten echten Code-PR aktiviert)
+if command -v pnpm >/dev/null 2>&1 && [ -f package.json ] && grep -q '"lint-staged"' package.json; then
+  pnpm exec lint-staged
+fi
