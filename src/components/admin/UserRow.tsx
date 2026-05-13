@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import type { Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { resetUserPassword, setUserActive, updateUserRole } from "@/modules/admin/users";
+import {
+  resetUserPassword,
+  setUserActive,
+  updateUserDefaultCostCenter,
+  updateUserRole,
+} from "@/modules/admin/users";
 
 const ROLES: Role[] = ["requester", "approver", "agentur", "admin"];
 
@@ -14,6 +19,7 @@ type UserItem = {
   email: string;
   role: Role;
   active: boolean;
+  defaultCostCenter: string | null;
 };
 
 export function UserRow({ user }: { user: UserItem }) {
@@ -21,6 +27,8 @@ export function UserRow({ user }: { user: UserItem }) {
   const [error, setError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const [newPw, setNewPw] = useState("");
+  const [costCenter, setCostCenter] = useState(user.defaultCostCenter ?? "");
+  const [ccSaved, setCcSaved] = useState(false);
 
   function run(fn: () => Promise<unknown>) {
     setError(null);
@@ -57,6 +65,42 @@ export function UserRow({ user }: { user: UserItem }) {
         ) : (
           <span className="text-muted-foreground">inaktiv</span>
         )}
+      </td>
+      <td className="px-4 py-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setCcSaved(false);
+            run(async () => {
+              await updateUserDefaultCostCenter({
+                userId: user.id,
+                defaultCostCenter: costCenter,
+              });
+              setCcSaved(true);
+            });
+          }}
+          className="flex items-center gap-2"
+        >
+          <Input
+            type="text"
+            value={costCenter}
+            onChange={(e) => {
+              setCostCenter(e.target.value);
+              setCcSaved(false);
+            }}
+            placeholder="z. B. KST-4711"
+            maxLength={120}
+            className="w-44"
+          />
+          <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+            Speichern
+          </Button>
+          {ccSaved && (
+            <span className="text-xs text-green-700 dark:text-green-400">
+              gespeichert
+            </span>
+          )}
+        </form>
       </td>
       <td className="px-4 py-3 space-y-2">
         <div className="flex gap-2">
