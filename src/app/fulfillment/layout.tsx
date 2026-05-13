@@ -9,5 +9,5 @@ export default async function FulfillmentLayout({ children }: { children: React.
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "agentur" && user.role !== "admin") redirect("/");
-  return <div className="mx-auto max-w-6xl p-6">{children}</div>;
+  return <div className="mx-auto max-w-5xl p-6">{children}</div>;
 }

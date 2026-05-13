@@ -9,5 +9,5 @@ export const dynamic = "force-dynamic";
 export default async function ReportsLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  return <div className="mx-auto max-w-6xl p-6">{children}</div>;
+  return <div className="mx-auto max-w-5xl p-6">{children}</div>;
 }

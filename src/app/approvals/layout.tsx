@@ -9,5 +9,5 @@ export default async function ApprovalsLayout({ children }: { children: React.Re
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "approver" && user.role !== "admin") redirect("/");
-  return <div className="mx-auto max-w-4xl p-6">{children}</div>;
+  return <div className="mx-auto max-w-5xl p-6">{children}</div>;
 }

@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role !== "admin") redirect("/");
   const openCount = await countOpenSupportReports();
   return (
-    <div className="mx-auto max-w-6xl p-6 space-y-6">
+    <div className="mx-auto max-w-5xl p-6 space-y-6">
       <nav className="flex gap-4 border-b pb-3 text-sm">
         <Link href="/admin/users" className="hover:underline">
           Benutzer
