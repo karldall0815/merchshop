@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getCart } from "@/modules/orders/cart";
 import { listAddressFavorites } from "@/modules/orders/addresses";
 import { CheckoutForm } from "@/components/checkout/CheckoutForm";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/modules/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,13 @@ export default async function CheckoutPage() {
     redirect("/cart");
   }
   const favorites = await listAddressFavorites();
+  const user = await getCurrentUser();
+  const dbUser = user
+    ? await db.user.findUnique({
+        where: { id: user.id },
+        select: { defaultCostCenter: true },
+      })
+    : null;
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -34,7 +43,7 @@ export default async function CheckoutPage() {
           ))}
         </ul>
       </section>
-      <CheckoutForm favorites={favorites} />
+      <CheckoutForm favorites={favorites} defaultCostCenter={dbUser?.defaultCostCenter ?? ""} />
     </div>
   );
 }

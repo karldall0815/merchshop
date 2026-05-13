@@ -2,18 +2,20 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/session";
 import { assertTransition } from "./state-machine";
 import type { AppRole } from "./state-machine";
 import { notifyOrderSubmitted } from "./notifications";
+import { ok, fail, type ActionResult } from "@/lib/action-result";
 
 type CheckoutInput = {
   occasion: string;
-  costCenter: string;
-  desiredDate: string; // YYYY-MM-DD from the date input
+  costCenter?: string;
+  desiredDate?: string; // YYYY-MM-DD from the date input
+  desiredDateIsDeadline?: boolean;
   shippingAddress: {
     recipient: string;
+    contact?: string;
     street: string;
     zip: string;
     city: string;
@@ -38,30 +40,42 @@ async function nextOrderNumber(): Promise<string> {
   return `${prefix}${String(next).padStart(5, "0")}`;
 }
 
-export async function submitCheckout(input: CheckoutInput): Promise<never> {
+export async function submitCheckout(
+  input: CheckoutInput
+): Promise<ActionResult<{ orderId: string }>> {
   const user = await getCurrentUser();
-  if (!user) throw new Error("unauthenticated");
+  if (!user) return fail("PERMISSION_DENIED", "Nicht eingeloggt");
 
   const cart = await db.order.findFirst({
     where: { requesterId: user.id, status: "draft" },
     include: { items: true },
   });
-  if (!cart || cart.items.length === 0) throw new Error("Warenkorb ist leer");
+  if (!cart) return fail("INVALID_STATE_TRANSITION", "Kein Entwurf vorhanden");
+  if (cart.items.length === 0) return fail("VALIDATION_ERROR", "Warenkorb ist leer");
 
   // Defensive trim + minimum-length checks (the form does HTML validation
   // already; this catches manual API calls).
   const occasion = input.occasion.trim();
-  const costCenter = input.costCenter.trim();
+  const costCenter = (input.costCenter ?? "").trim() || null;
   const addr = input.shippingAddress;
   for (const k of ["recipient", "street", "zip", "city"] as const) {
-    if (!addr[k]?.trim()) throw new Error(`Adressfeld ${k} fehlt`);
+    if (!addr[k]?.trim()) return fail("VALIDATION_ERROR", `Adressfeld ${k} fehlt`);
   }
-  if (!occasion) throw new Error("Anlass fehlt");
-  if (!costCenter) throw new Error("Kostenstelle fehlt");
-  const desired = new Date(input.desiredDate);
-  if (Number.isNaN(desired.getTime())) throw new Error("Wunschtermin ungültig");
+  if (!occasion) return fail("VALIDATION_ERROR", "Anlass fehlt");
 
-  assertTransition(cart.status, "pending", (user.role as AppRole) ?? "requester");
+  let desired: Date | null = null;
+  if (input.desiredDate) {
+    const parsed = new Date(input.desiredDate);
+    if (Number.isNaN(parsed.getTime())) return fail("VALIDATION_ERROR", "Wunschtermin ungültig");
+    desired = parsed;
+  }
+  const isDeadline = !!(desired && input.desiredDateIsDeadline);
+
+  try {
+    assertTransition(cart.status, "pending", (user.role as AppRole) ?? "requester");
+  } catch (e) {
+    return fail("INVALID_STATE_TRANSITION", e instanceof Error ? e.message : "Ungültiger Statusübergang");
+  }
 
   const orderNumber = await nextOrderNumber();
 
@@ -73,8 +87,10 @@ export async function submitCheckout(input: CheckoutInput): Promise<never> {
       occasion,
       costCenter,
       desiredDate: desired,
+      desiredDateIsDeadline: isDeadline,
       shippingAddress: {
         recipient: addr.recipient.trim(),
+        contact: (addr.contact ?? "").trim() || undefined,
         street: addr.street.trim(),
         zip: addr.zip.trim(),
         city: addr.city.trim(),
@@ -98,5 +114,6 @@ export async function submitCheckout(input: CheckoutInput): Promise<never> {
   revalidatePath("/cart");
   revalidatePath("/orders");
   revalidatePath("/approvals");
-  redirect(`/orders/${cart.id}`);
+
+  return ok({ orderId: cart.id });
 }
