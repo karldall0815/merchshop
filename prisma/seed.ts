@@ -1,5 +1,7 @@
-import { db } from "../src/lib/db";
-import { BUILTIN_CATEGORIES } from "../src/modules/categories/defaults";
+import { PrismaClient } from "@prisma/client";
+import { BUILTIN_CATEGORIES } from "./seed-data/categories";
+
+const db = new PrismaClient();
 
 async function main() {
   await db.systemSetup.upsert({
