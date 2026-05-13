@@ -41,14 +41,21 @@ const cutOptions: AttributeOption[] = [
 ];
 
 const allergenOptions: AttributeOption[] = [
-  "gluten", "milk", "egg", "nuts", "soy", "sesame", "celery",
-  "mustard", "fish", "crustaceans", "lupines", "sulfites", "peanuts", "mollusks"
-].map((v) => ({ value: v, label: ({
-  gluten: "Gluten", milk: "Milch", egg: "Ei", nuts: "Nüsse", soy: "Soja",
-  sesame: "Sesam", celery: "Sellerie", mustard: "Senf", fish: "Fisch",
-  crustaceans: "Krebstiere", lupines: "Lupinen", sulfites: "Sulfite",
-  peanuts: "Erdnüsse", mollusks: "Weichtiere"
-}[v] ?? v) }));
+  { value: "gluten",      label: "Gluten"     },
+  { value: "milk",        label: "Milch"      },
+  { value: "egg",         label: "Ei"         },
+  { value: "nuts",        label: "Nüsse"      },
+  { value: "soy",         label: "Soja"       },
+  { value: "sesame",      label: "Sesam"      },
+  { value: "celery",      label: "Sellerie"   },
+  { value: "mustard",     label: "Senf"       },
+  { value: "fish",        label: "Fisch"      },
+  { value: "crustaceans", label: "Krebstiere" },
+  { value: "lupines",     label: "Lupinen"    },
+  { value: "sulfites",    label: "Sulfite"    },
+  { value: "peanuts",     label: "Erdnüsse"   },
+  { value: "mollusks",    label: "Weichtiere" },
+];
 
 const writingMaterialOptions: AttributeOption[] = [
   { value: "plastic", label: "Plastik" },
