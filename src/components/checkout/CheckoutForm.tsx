@@ -8,7 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { createAddressFavorite, deleteAddressFavorite } from "@/modules/orders/addresses";
 import { submitCheckout } from "@/modules/orders/checkout";
-import { labelForCode } from "@/lib/error-messages";
+import { FormErrorBanner } from "@/components/forms/FormErrorBanner";
+import type { ActionResult } from "@/lib/action-result";
+
+type ErrorState =
+  | { kind: "result"; value: ActionResult<unknown> }
+  | { kind: "message"; value: string }
+  | null;
 
 type AddressFavorite = {
   id: string;
@@ -31,7 +37,7 @@ export function CheckoutForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<ErrorState>(null);
 
   const [occasion, setOccasion] = useState("");
   const [costCenter, setCostCenter] = useState(defaultCostCenter ?? "");
@@ -76,13 +82,16 @@ export function CheckoutForm({
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setErrorState(null);
     startTransition(async () => {
       if (saveAsFav && favLabel.trim()) {
         try {
           await createAddressFavorite({ label: favLabel.trim(), ...addr });
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Favorit speichern fehlgeschlagen");
+          setErrorState({
+            kind: "message",
+            value: err instanceof Error ? err.message : "Favorit speichern fehlgeschlagen",
+          });
           return;
         }
       }
@@ -94,7 +103,7 @@ export function CheckoutForm({
         shippingAddress: { ...addr, contact: contact || undefined },
       });
       if (!res.ok) {
-        setError(res.message || labelForCode(res.code));
+        setErrorState({ kind: "result", value: res });
         return;
       }
       router.push("/orders");
@@ -106,7 +115,10 @@ export function CheckoutForm({
       try {
         await deleteAddressFavorite(id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Löschen fehlgeschlagen");
+        setErrorState({
+          kind: "message",
+          value: e instanceof Error ? e.message : "Löschen fehlgeschlagen",
+        });
       }
     });
   }
@@ -295,7 +307,10 @@ export function CheckoutForm({
         </div>
       </fieldset>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <FormErrorBanner
+        result={errorState?.kind === "result" ? errorState.value : null}
+        message={errorState?.kind === "message" ? errorState.value : null}
+      />
 
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Sende…" : "Bestellung absenden"}
