@@ -76,6 +76,10 @@ export async function getShopProduct(id: string) {
       sku: true,
       name: true,
       description: true,
+      attributes: true,
+      category: {
+        select: { id: true, slug: true, name: true, attributeSchema: true },
+      },
       images: { orderBy: { sortOrder: "asc" }, select: { id: true, url: true } },
       variants: {
         where: { active: true },
