@@ -51,5 +51,9 @@ USER nextjs
 
 EXPOSE 3000
 
-# Apply migrations on every container start, then launch the standalone server.
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node server.js"]
+# On every container start:
+#   1. Apply pending Prisma migrations.
+#   2. Run the (idempotent, upsert-based) seed — keeps built-in categories and
+#      default settings in sync with the code without manual intervention.
+#   3. Launch the standalone Next.js server.
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts && node server.js"]
