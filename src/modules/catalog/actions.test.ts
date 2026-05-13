@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({
     productVariant: { create: vi.fn().mockResolvedValue({ id: "v1" }), deleteMany: vi.fn(), createMany: vi.fn() },
     stockMovement: { create: vi.fn().mockResolvedValue({ id: "m1" }) },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    category: { findUnique: vi.fn() },
   },
 }));
 
@@ -70,6 +71,64 @@ describe("archiveProduct", () => {
       where: { id: "p1" }, data: { active: false },
     }));
     expect(m.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("createProduct with category", () => {
+  beforeEach(() => {
+    m.category.findUnique.mockResolvedValue({
+      id: "cat-food",
+      attributeSchema: [
+        { key: "mhd",      label: "MHD",  type: "date",    sortOrder: 1 },
+        { key: "packSize", label: "Pack", type: "number",  sortOrder: 2, min: 1 },
+        { key: "bio",      label: "Bio",  type: "boolean", sortOrder: 3 },
+      ],
+      variantTemplate: null,
+    });
+  });
+
+  it("creates with valid attributes", async () => {
+    await expect(createProduct({
+      sku: "BR-001", name: "Brezel", minStock: 0, variants: [], initialStock: 0,
+      categoryId: "cat-food",
+      attributes: { mhd: "2026-12-31", packSize: 10, bio: true },
+    }, "actor-1")).rejects.toThrow("NEXT_REDIRECT");
+    expect(m.product.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        categoryId: "cat-food",
+        attributes: expect.objectContaining({ mhd: "2026-12-31", packSize: 10, bio: true }),
+      }),
+    }));
+  });
+
+  it("rejects invalid attribute (bad date)", async () => {
+    await expect(createProduct({
+      sku: "BR-002", name: "X", minStock: 0, variants: [], initialStock: 0,
+      categoryId: "cat-food",
+      attributes: { mhd: "31.12.2026" },
+    }, "actor-1")).rejects.toThrow();
+  });
+
+  it("strips unknown attribute keys silently", async () => {
+    await expect(createProduct({
+      sku: "BR-003", name: "X", minStock: 0, variants: [], initialStock: 0,
+      categoryId: "cat-food",
+      attributes: { mhd: "2026-12-31", foo: "drop" },
+    }, "actor-1")).rejects.toThrow("NEXT_REDIRECT");
+    const callArg = m.product.create.mock.calls[0][0].data.attributes;
+    expect(callArg.foo).toBeUndefined();
+    expect(callArg.mhd).toBe("2026-12-31");
+  });
+
+  it("creates without category (attributes ignored)", async () => {
+    await expect(createProduct({
+      sku: "FR-001", name: "Frei", minStock: 0, variants: [], initialStock: 0,
+      categoryId: null,
+      attributes: { something: "ignored" },
+    }, "actor-1")).rejects.toThrow("NEXT_REDIRECT");
+    const callArg = m.product.create.mock.calls[0][0].data;
+    expect(callArg.categoryId).toBeNull();
+    expect(callArg.attributes).toEqual({});
   });
 });
 

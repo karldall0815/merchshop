@@ -5,9 +5,19 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { productCreateSchema, productUpdateSchema, type ProductCreateInput, type ProductUpdateInput } from "./schemas";
 import { recordMovement } from "@/modules/inventory/movements";
+import { buildAttributeValidator } from "@/modules/categories/attribute-validator";
+import type { AttributeSchemaItem } from "@/modules/categories/defaults";
+import { Prisma } from "@prisma/client";
 
 export async function createProduct(raw: ProductCreateInput, actorId: string) {
   const data = productCreateSchema.parse(raw);
+  let validatedAttributes: Record<string, unknown> = {};
+  if (data.categoryId) {
+    const cat = await db.category.findUnique({ where: { id: data.categoryId } });
+    if (!cat) throw new Error("Category not found");
+    const validator = buildAttributeValidator(((cat.attributeSchema as unknown) as AttributeSchemaItem[]) ?? []);
+    validatedAttributes = validator.parse(data.attributes ?? {}) as Record<string, unknown>;
+  }
   const product = await db.product.create({
     data: {
       sku: data.sku,
@@ -15,6 +25,8 @@ export async function createProduct(raw: ProductCreateInput, actorId: string) {
       description: data.description,
       minStock: data.minStock,
       createdById: actorId,
+      categoryId: data.categoryId ?? null,
+      attributes: validatedAttributes as Prisma.InputJsonValue,
     },
   });
   if (data.variants.length > 0) {
@@ -43,6 +55,21 @@ export async function createProduct(raw: ProductCreateInput, actorId: string) {
 
 export async function updateProduct(raw: ProductUpdateInput, actorId: string) {
   const data = productUpdateSchema.parse(raw);
+  const existing = await db.product.findUnique({ where: { id: data.id } });
+  if (!existing) throw new Error("Product not found");
+
+  const categoryChanged = (existing.categoryId ?? null) !== (data.categoryId ?? null);
+  if (categoryChanged && !data.confirmCategoryChange) {
+    throw new Error("CATEGORY_CHANGE_REQUIRES_CONFIRM");
+  }
+
+  let validatedAttributes: Record<string, unknown> = {};
+  if (data.categoryId) {
+    const cat = await db.category.findUnique({ where: { id: data.categoryId } });
+    if (!cat) throw new Error("Category not found");
+    const validator = buildAttributeValidator(((cat.attributeSchema as unknown) as AttributeSchemaItem[]) ?? []);
+    validatedAttributes = validator.parse(data.attributes ?? {}) as Record<string, unknown>;
+  }
   await db.product.update({
     where: { id: data.id },
     data: {
@@ -51,6 +78,8 @@ export async function updateProduct(raw: ProductUpdateInput, actorId: string) {
       description: data.description,
       minStock: data.minStock,
       active: data.active ?? true,
+      categoryId: data.categoryId ?? null,
+      attributes: validatedAttributes as Prisma.InputJsonValue,
     },
   });
   await db.productVariant.deleteMany({ where: { productId: data.id } });
