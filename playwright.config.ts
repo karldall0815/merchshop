@@ -11,6 +11,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: {
       AUTH_TRUST_HOST: "1",
+      MERCHSHOP_E2E: "1",
     },
   },
 });
