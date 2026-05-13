@@ -26,6 +26,7 @@ model User {
   role         Role
   active       Boolean  @default(true)
   totpSecret   String?
+  defaultCostCenter String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -34,6 +35,8 @@ model User {
   approvedOrders   Order[]           @relation("OrderApprover")
   approvals        ApprovalLog[]
   addressFavorites AddressFavorite[]
+  supportReports         SupportReport[] @relation("SupportReporter")
+  resolvedSupportReports SupportReport[] @relation("SupportResolver")
 }
 
 model AddressFavorite {
@@ -202,6 +205,7 @@ model Order {
   occasion        String?
   costCenter      String?
   desiredDate     DateTime?
+  desiredDateIsDeadline Boolean @default(false)
   shippingAddress Json?
 
   // Approval / fulfillment side-channel.
@@ -254,4 +258,28 @@ model ApprovalLog {
   createdAt DateTime @default(now())
 
   @@index([orderId, createdAt])
+}
+
+model SupportReport {
+  id           String   @id @default(cuid())
+  reporterId   String?
+  reporter     User?    @relation("SupportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  type         String                               // "auto" | "manual"
+  url          String?
+  userAgent    String?
+  errorDigest  String?
+  errorMessage String?  @db.Text
+  errorStack   String?  @db.Text
+  userMessage  String?  @db.Text
+  count        Int      @default(1)
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+  status       String   @default("open")            // open | seen | resolved
+  resolvedById String?
+  resolvedBy   User?    @relation("SupportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([errorDigest, url])
 }
