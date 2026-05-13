@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { Prisma } from "@prisma/client";
 
 vi.mock("@/lib/db", () => ({
   db: {
@@ -77,7 +78,7 @@ describe("getProductsUsingAttributeKey", () => {
     expect(m.product.findMany).toHaveBeenCalledWith({
       where: {
         categoryId: "cat-id",
-        attributes: { path: ["mhd"], not: null },
+        attributes: { path: ["mhd"], not: Prisma.DbNull },
       },
       select: { id: true, sku: true, name: true },
     });

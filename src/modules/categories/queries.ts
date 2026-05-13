@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 export async function listCategories({ activeOnly }: { activeOnly: boolean }) {
@@ -26,7 +27,7 @@ export async function getProductsUsingAttributeKey(categoryId: string, attribute
   return db.product.findMany({
     where: {
       categoryId,
-      attributes: { path: [attributeKey], not: null },
+      attributes: { path: [attributeKey], not: Prisma.DbNull },
     },
     select: { id: true, sku: true, name: true },
   });
