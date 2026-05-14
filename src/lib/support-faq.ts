@@ -173,6 +173,32 @@ export const FAQ_ENTRIES: FaqEntry[] = [
       `Movements pro Artikel.`,
   },
   {
+    id: "low-stock-alert",
+    question: "Was passiert, wenn ein Artikel den Mindestbestand unterschreitet?",
+    audience: ["admin", "agentur"],
+    answer:
+      `Alle 12 Stunden läuft ein automatischer Check (Cron-Job): er prüft sämtliche aktiven ` +
+      `Artikel mit gesetztem Mindestbestand (> 0). Wenn der aktuelle Bestand darunter rutscht, ` +
+      `geht eine Mail an **alle aktiven Admin-User** mit der Betreffzeile "MerchShop: ` +
+      `Mindestbestand unterschritten" — Inhalt: pro betroffener Artikel eine Zeile mit Name, ` +
+      `aktuellem Stand und konfiguriertem Mindestbestand. Wenn der Mail-Versand nicht ` +
+      `konfiguriert ist, wird der Job als "skipped" geloggt (kein Fehler) — sobald SMTP ` +
+      `verfügbar ist, kommen die Mails beim nächsten Lauf. Mindestbestand pro Artikel setzt ` +
+      `du beim Artikel-Anlegen oder im Inventar-Detail.`,
+  },
+  {
+    id: "sku-pattern",
+    question: "Wie funktionieren die automatisch vorgeschlagenen SKUs?",
+    audience: ["admin", "agentur"],
+    answer:
+      `Unter "Grundeinstellungen" definierst du ein SKU-Präfix (z.B. "ART-") und die Anzahl ` +
+      `Ziffern (z.B. 4 → "ART-0001"). Beim Anlegen eines neuen Artikels wird der nächste ` +
+      `Vorschlag automatisch berechnet: er nimmt die höchste bestehende SKU mit diesem ` +
+      `Präfix und zählt um 1 hoch. Du kannst den Vorschlag im Anlegen-Formular jederzeit ` +
+      `überschreiben — die SKU muss nur eindeutig sein. Wenn du das Präfix später änderst, ` +
+      `beginnt der Zähler fürs neue Präfix wieder bei 1.`,
+  },
+  {
     id: "audit-logs",
     question: "Wo finde ich die Audit-Logs / wer hat was wann gemacht?",
     audience: ["admin"],

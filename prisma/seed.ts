@@ -47,6 +47,19 @@ async function main() {
     });
   }
   console.log(`Seeded ${SUPPORT_SETTINGS.length} support default settings`);
+
+  const CATALOG_SETTINGS: { key: string; value: string }[] = [
+    { key: "catalog.skuPrefix",  value: "ART-" },
+    { key: "catalog.skuPadding", value: "4" },
+  ];
+  for (const s of CATALOG_SETTINGS) {
+    await db.setting.upsert({
+      where: { key: s.key },
+      create: { key: s.key, value: s.value, encrypted: false },
+      update: {},   // admin may have customized — preserve their values
+    });
+  }
+  console.log(`Seeded ${CATALOG_SETTINGS.length} catalog default settings`);
 }
 
 main()

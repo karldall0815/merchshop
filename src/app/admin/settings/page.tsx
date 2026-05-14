@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
 import { ReinitSetupButton } from "@/components/admin/ReinitSetupButton";
+import { SkuSettingsForm } from "@/components/admin/SkuSettingsForm";
+import { getGeneralSettings } from "@/modules/admin/general-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -25,17 +27,28 @@ export default async function AdminSettingsPage() {
   });
   const setup = await db.systemSetup.findUnique({ where: { id: 1 } });
   const byKey = new Map(rows.map((r) => [r.key, r]));
+  const general = await getGeneralSettings();
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Einstellungen</h1>
+        <h1 className="text-2xl font-semibold">Grundeinstellungen</h1>
         <p className="text-sm text-muted-foreground">
-          Übersicht der ohne Klartext-Risiko anzeigbaren Settings. Geheime Werte
+          Anpassbare Stammwerte und Übersicht der ohne Klartext-Risiko anzeigbaren Settings. Geheime Werte
           (Passwörter, API-Keys) sind verschlüsselt gespeichert und werden hier
           nicht angezeigt — für Änderungen bitte den Setup-Wizard erneut starten.
         </p>
       </header>
+
+      <section className="rounded-lg border bg-card p-4 space-y-3">
+        <h2 className="font-medium">Artikelnummer-Schema (SKU)</h2>
+        <p className="text-sm text-muted-foreground">
+          Definiere Präfix und Anzahl der Ziffern für automatisch vorgeschlagene SKUs bei der Artikelanlage.
+          Der Vorschlag basiert auf der höchsten vorhandenen passenden SKU + 1. Der Anleger kann den Vorschlag
+          jederzeit überschreiben.
+        </p>
+        <SkuSettingsForm initial={general} />
+      </section>
 
       <section className="overflow-hidden rounded-lg border">
         <table className="w-full text-sm">

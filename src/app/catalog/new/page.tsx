@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/modules/auth/session";
 import { ProductForm } from "@/components/catalog/ProductForm";
 import { listCategories } from "@/modules/categories/queries";
+import { getNextSuggestedSku } from "@/modules/catalog/sku-suggest";
 import type { AttributeSchemaItem, VariantTemplate } from "@/modules/categories/defaults";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function NewProductPage() {
     variantTemplate:
       ((c.variantTemplate as unknown) as VariantTemplate | null) ?? null,
   }));
+  const suggestedSku = await getNextSuggestedSku();
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Neuer Artikel</h1>
@@ -25,6 +27,7 @@ export default async function NewProductPage() {
         mode="create"
         actorId={user?.id ?? ""}
         categories={categories}
+        suggestedSku={suggestedSku}
       />
     </div>
   );
