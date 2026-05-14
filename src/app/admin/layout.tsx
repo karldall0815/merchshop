@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           Audit-Log
         </Link>
         <Link href="/admin/settings" className="hover:underline">
-          Einstellungen
+          Grundeinstellungen
         </Link>
         <Link href="/admin/categories" className="hover:underline">
           Kategorien

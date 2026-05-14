@@ -29,6 +29,8 @@ interface ProductFormProps {
   categories: CategoryOption[];
   initialCategoryId?: string | null;
   initialAttributes?: Record<string, unknown>;
+  /** Pre-filled SKU suggestion for create mode (admin-configured prefix + auto-counter). */
+  suggestedSku?: string;
 }
 
 function isAttrSet(v: unknown): boolean {
@@ -59,6 +61,7 @@ export function ProductForm({
   categories,
   initialCategoryId,
   initialAttributes,
+  suggestedSku,
 }: ProductFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -197,8 +200,13 @@ export function ProductForm({
             name="sku"
             required
             placeholder="DEMO-001"
-            defaultValue={initial?.sku}
+            defaultValue={initial?.sku ?? suggestedSku ?? ""}
           />
+          {mode === "create" && suggestedSku && (
+            <p className="text-xs text-muted-foreground">
+              Vorschlag aus den Grundeinstellungen — kann überschrieben werden.
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="name">Name *</Label>
