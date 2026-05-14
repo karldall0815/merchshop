@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { TopNav } from "@/components/nav/TopNav";
+import { Footer } from "@/components/layout/Footer";
 import { getActiveTheme, themeStyleVars, googleFontHref } from "@/lib/theme";
 import { getSetting } from "@/lib/settings";
 import "./globals.css";
@@ -65,6 +66,7 @@ export default async function RootLayout({
         <SessionProvider>
           <TopNav logoUrl={logoUrl} replaceWordmark={replaceWordmark} />
           {children}
+          <Footer />
         </SessionProvider>
       </body>
     </html>

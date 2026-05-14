@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { getCurrentUser } from "@/modules/auth/session";
 import { hashPassword } from "@/modules/auth/hash";
 
@@ -127,6 +127,80 @@ export async function updateUserDefaultCostCenter(
       diff: { from: before.defaultCostCenter, to: next },
     },
   });
+  revalidatePath("/admin/users");
+}
+
+const updateUserSchema = z.object({
+  userId: z.string().min(1),
+  email: z.string().email(),
+  name: z.string().min(2).max(120),
+  role: roleEnum,
+  defaultCostCenter: z.string().max(120).optional().nullable(),
+  newPassword: z.string().max(200).optional().nullable(),
+});
+
+export async function updateUser(input: z.input<typeof updateUserSchema>) {
+  const actor = await requireAdmin();
+  const data = updateUserSchema.parse(input);
+
+  const before = await db.user.findUnique({
+    where: { id: data.userId },
+    select: { email: true, name: true, role: true, defaultCostCenter: true },
+  });
+  if (!before) throw new Error("User existiert nicht");
+
+  const nextEmail = data.email.toLowerCase().trim();
+  const nextName = data.name.trim();
+  const nextCostCenter = data.defaultCostCenter?.trim() || null;
+  const passwordToSet = data.newPassword?.trim() || "";
+
+  if (passwordToSet && passwordToSet.length < 10) {
+    throw new Error("Passwort zu kurz (min. 10)");
+  }
+
+  if (nextEmail !== before.email) {
+    const collision = await db.user.findUnique({
+      where: { email: nextEmail },
+      select: { id: true },
+    });
+    if (collision && collision.id !== data.userId) {
+      throw new Error("E-Mail bereits vergeben");
+    }
+  }
+
+  const updates: Prisma.UserUpdateInput = {
+    email: nextEmail,
+    name: nextName,
+    role: data.role,
+    defaultCostCenter: nextCostCenter,
+  };
+  if (passwordToSet) {
+    updates.passwordHash = await hashPassword(passwordToSet);
+  }
+
+  await db.user.update({ where: { id: data.userId }, data: updates });
+
+  const diff: Record<string, unknown> = {};
+  if (nextEmail !== before.email) diff.email = { from: before.email, to: nextEmail };
+  if (nextName !== before.name) diff.name = { from: before.name, to: nextName };
+  if (data.role !== before.role) diff.role = { from: before.role, to: data.role };
+  if (nextCostCenter !== before.defaultCostCenter) {
+    diff.defaultCostCenter = { from: before.defaultCostCenter, to: nextCostCenter };
+  }
+  if (passwordToSet) diff.passwordReset = true;
+
+  if (Object.keys(diff).length > 0) {
+    await db.auditLog.create({
+      data: {
+        actorId: actor.id,
+        entity: "User",
+        entityId: data.userId,
+        action: "update",
+        diff: diff as Prisma.InputJsonValue,
+      },
+    });
+  }
+
   revalidatePath("/admin/users");
 }
 

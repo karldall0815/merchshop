@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { ReinitSetupButton } from "@/components/admin/ReinitSetupButton";
 import { SkuSettingsForm } from "@/components/admin/SkuSettingsForm";
-import { getGeneralSettings } from "@/modules/admin/general-settings";
+import { CostCentersForm } from "@/components/admin/CostCentersForm";
+import { getCostCenters, getGeneralSettings } from "@/modules/admin/general-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function AdminSettingsPage() {
   const setup = await db.systemSetup.findUnique({ where: { id: 1 } });
   const byKey = new Map(rows.map((r) => [r.key, r]));
   const general = await getGeneralSettings();
+  const costCenters = await getCostCenters();
 
   return (
     <div className="space-y-6">
@@ -48,6 +50,15 @@ export default async function AdminSettingsPage() {
           jederzeit überschreiben.
         </p>
         <SkuSettingsForm initial={general} />
+      </section>
+
+      <section className="rounded-lg border bg-card p-4 space-y-3">
+        <h2 className="font-medium">Kostenstellen</h2>
+        <p className="text-sm text-muted-foreground">
+          Liste der wählbaren Kostenstellen. Wird im Benutzer-Bearbeiten-Dialog als
+          Auswahlfeld für die Default-Kostenstelle angeboten.
+        </p>
+        <CostCentersForm initial={costCenters} />
       </section>
 
       <section className="overflow-hidden rounded-lg border">

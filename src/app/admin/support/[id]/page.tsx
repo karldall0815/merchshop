@@ -21,7 +21,7 @@ export default async function AdminSupportDetailPage({
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <Link href="/admin/support" className="text-sm underline">← zurück zur Liste</Link>
         {report.status !== "resolved" && (
