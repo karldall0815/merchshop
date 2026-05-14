@@ -42,6 +42,10 @@ export default function GlobalError({
           {error.digest ? ` Fehler-ID: ${error.digest}` : ""}
         </p>
         <p>
+          {/* global-error renders its own <html>/<body> after a render-time
+              crash; next/link is not guaranteed to work in that reduced
+              context, so a plain anchor with a full navigation is correct. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/" style={{ color: "#4f46e5" }}>
             Zur Startseite
           </a>

@@ -69,7 +69,7 @@ export function CustomFiltersSidebar({ schema }: Props) {
             <label className="flex items-center gap-2 mt-1">
               <input type="checkbox" checked={get(item.key) === "true"}
                 onChange={(e) => setSingle(item.key, "", e.target.checked ? "true" : "")} />
-              nur „ja"
+              nur „ja“
             </label>
           )}
           {item.type === "select" && (

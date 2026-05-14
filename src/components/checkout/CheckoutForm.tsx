@@ -61,6 +61,10 @@ export function CheckoutForm({
   const [favLabel, setFavLabel] = useState("");
 
   useEffect(() => {
+    // Reset the "is deadline" flag whenever the date itself is cleared.
+    // The setState cannot loop: after it runs, the condition becomes false
+    // because desiredDateIsDeadline is then false, so the effect no-ops.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!desiredDate && desiredDateIsDeadline) setDesiredDateIsDeadline(false);
   }, [desiredDate, desiredDateIsDeadline]);
 
