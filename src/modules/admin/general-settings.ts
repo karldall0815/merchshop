@@ -6,20 +6,24 @@ import { revalidatePath } from "next/cache";
 import { ok, fail, type ActionResult } from "@/lib/action-result";
 import { getCurrentUser } from "@/modules/auth/session";
 
-export const generalSettingsSchema = z.object({
+// Schemas and inferred types are kept private to this module: a file with
+// `"use server"` at the top may only export async functions (Next.js
+// build-time rule). Keeping them un-exported is fine — they're only used
+// by the action implementations below.
+const generalSettingsSchema = z.object({
   skuPrefix: z.string().max(40).regex(/^[A-Za-z0-9_\-]*$/, "Nur Buchstaben, Ziffern, Bindestrich und Unterstrich erlaubt"),
   skuPadding: z.coerce.number().int().min(1).max(12),
 });
 
-export type GeneralSettingsInput = z.infer<typeof generalSettingsSchema>;
+type GeneralSettingsInput = z.infer<typeof generalSettingsSchema>;
 
 const COST_CENTERS_KEY = "catalog.costCenters";
 
-export const costCentersSchema = z.object({
+const costCentersSchema = z.object({
   items: z.array(z.string().min(1).max(120)).max(500),
 });
 
-export type CostCentersInput = z.infer<typeof costCentersSchema>;
+type CostCentersInput = z.infer<typeof costCentersSchema>;
 
 export async function getGeneralSettings(): Promise<{ skuPrefix: string; skuPadding: number }> {
   const rows = await db.setting.findMany({
